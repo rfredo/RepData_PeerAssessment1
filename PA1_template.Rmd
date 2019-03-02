@@ -1,25 +1,197 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment 1'
+author: "roei fredo"
+date: "March 2, 2019"
+output: html_document
 ---
 
+#Introduction
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior. 
 
-## Loading and preprocessing the data
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
+#Data
 
+The variables included in this dataset are:
+
+- steps: Number of steps taking in a 5-minute interval (missing values are coded as NA)
+
+- date: The date on which the measurement was taken in YYYY-MM-DD format
+
+- interval: Identifier for the 5-minute interval in which measurement was taken
+
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
+
+#Assignment
+
+first we will set some global options
+
+```{r setup}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+
+```
+
+## loading and processing the data
+
+We will set the r packages to be used in the assignment:
+
+```{r set_packages, include = FALSE}
+
+library(filesstrings)
+library(dplyr)
+library(ggplot2)
+library(xtable)
+```
+
+and then, read the data into r:
+```{r read_activity}
+if(!dir.exists("C:/Users/roeifredo/Documents/reproducible research/Assignment1")) {
+    dir.create("C:/Users/roeifredo/Documents/reproducible research/Assignment1")
+    file.move("C:/Users/roeifredo/Downloads/repdata_data_activity.zip", 
+              "C:/Users/roeifredo/Documents/reproducible research")
+    
+}
+setwd("C:/Users/roeifredo/Documents/reproducible research/Assignment1")
+
+if(!file.exists("C:/Users/roeifredo/Documents/reproducible research/Assignment1/activity.csv")){
+    unzip("C:/Users/roeifredo/Documents/reproducible research/Assignment1/repdata_data_activity.zip"
+          ,exdir = getwd())
+    
+}
+activity <- read.csv("./activity.csv")
+summary(activity)
+str(activity)
+
+```
 
 ## What is mean total number of steps taken per day?
 
+first we will show a histogram of total number of steps taken each day
 
+```{r total_steps_per_day_hist}
+active_by_date <- summarize(group_by(activity, date), total_steps = sum(steps))
+g = ggplot(active_by_date, aes(total_steps))
+g + geom_histogram(bins = 15) +
+    labs(title = "Total Number of Steps per Day", x = "Steps per Day", y = "Frequency")
+
+```
+
+then, we will calculate the mean and median values for total daily steps
+
+```{r mean_steps_per_day_hist, results = "hide"}
+
+mean_steps <- mean(active_by_date$total_steps, na.rm = T)
+median_steps <- median(active_by_date$total_steps, na.rm = T)
+
+```
+
+The mean total steps per day taken by the subject is `r mean_steps`; The median total steps per day taken by the subject is `r median_steps`
 
 ## What is the average daily activity pattern?
 
+first we will plot the mean steps taken by the subject per interval:
+
+```{r mean_steps_per_interval_plot}
+
+active_by_interval <- summarize(group_by(activity, interval), average_steps = mean(steps, na.rm = T))    
+g <- ggplot(active_by_interval, aes(interval, average_steps))
+g + geom_line()+ labs(title = "Average Number of Steps per Interval of 5 min", x = "Steps per Interval", y = "Frequency")
+
+```
+
+then, we will find the value for the busiest interval:
+
+```{r tota_steps_per_interval, results = "hide"}
+
+mean_per_interval <- active_by_interval[which.max(active_by_interval$average_steps), 1]
+
+```
+
+The `r mean_per_interval`th interval, is, on average the most active interval for the chosen subject
 
 
 ## Imputing missing values
 
+first we will calculate the number of missing values in the step count vector of activity dataset:
 
+```{r NA_count, results = "hide"} 
+NA_count <- sum(complete.cases(activity))
+
+```
+
+Our activity dataset has `r NA_count` rows with missing values
+
+next, we will replace NA values with the mean for 5-minute interval and create a new dataset W/O NA values
+
+```{r NA_replace} 
+
+activity1 <- merge(activity, active_by_interval, by = "interval", sort = T)
+activity1 <- arrange(activity1, date, interval)
+activity1_NAs <- which(is.na(activity1$steps))
+for(i in activity1_NAs) {
+    activity1[i, 2] <- activity1[i, 4]
+}
+activity1 <- activity1[, c(2,3,1)]
+
+print(head(activity1))
+
+```
+
+Now, we will analyse the new NA-free dataset and show a histogram of total number of steps taken each day 
+
+```{r total_steps_per_day_hist1}
+active_by_date_imp <- summarize(group_by(activity1, date), total_steps = sum(steps))
+g = ggplot(active_by_date_imp, aes(total_steps))
+g + geom_histogram(bins = 15) +
+    labs(title = "Total Number of Steps per Day", x = "Steps per Day", y = "Frequency - Imputed")
+
+```
+
+then, we will calculate again the mean and median values for total daily steps
+
+```{r mean_steps_per_day_hist1, results = "hide"}
+
+mean_steps1 <- mean(active_by_date_imp$total_steps, na.rm = T)
+median_steps1 <- median(active_by_date_imp$total_steps, na.rm = T)
+
+```
+
+The mean total steps per day taken by the subject is `r mean_steps1`; The median total steps per day taken by the subject is `r median_steps1`
+
+```{r comparing_table, results = "asis"}
+
+mean_median_compare <- data.frame(c(mean_steps, median_steps), c(mean_steps1, median_steps1))
+colnames(mean_median_compare) <- c("NA removed", "NA imputed")
+rownames(mean_median_compare) <- c("mean", "median")
+xt <- xtable(mean_median_compare)
+print(xt, "html")
+
+```
+
+As we can see, when comparing between dataset before and after replacing NAs, there is no difference in mean values and a small difference in median values.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+first we will create a new binary variable indicating a given date as a weekday or a weekend day:
+
+```{r weekday_weeend_difference} 
+
+activity1$day_type <- as.factor(ifelse(weekdays(as.Date(activity1$date)) %in% 
+c("Monday", "Tuesday", "Wednesday", "Thursday","Friday"), yes = "weekday", no = "weekend"))
+head(activity1)
+
+```
+
+next, we will plot the average number of steps taken across weekdays and weekend
+
+```{r weekday_weeend_difference_plot} 
+
+active_by_interval_type <- summarize(group_by(activity1, interval, day_type), average_steps = mean(steps, na.rm = T))    
+g <- ggplot(active_by_interval_type, aes(interval, average_steps))
+g + geom_line() + facet_grid(day_type ~ .) +
+    labs(title = "Average Number of Steps per interval of 5 min", x = "Steps per Interval", y = "Frequency - Imputed")
+
+```
+
+As we can see, during weekdays the subject has an early start, that peaks between 8am-9am. during the weekend, there more activity in later hours- activity is more spread along the day
